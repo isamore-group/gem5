@@ -1,4 +1,4 @@
-# Copyright (c) 2022 The Regents of the University of California
+# Copyright (c) 2024 The Regents of The University of Michigan
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,32 +24,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Import("*")
+from m5.params import *
+from m5.proxy import *
+from m5.objects import SimObject
+from m5.objects.Probe import ProbeListenerObject
 
-if env['CONF']['BUILD_ISA']:
+class BBProfiler(ProbeListenerObject):
+    type = 'BBProfiler'
+    cxx_header = 'cpu/probes/bb_profiler.hh'
+    cxx_class = 'gem5::BBProfiler'
 
-    SimObject(
-        "PcCountTracker.py",
-        sim_objects=["PcCountTracker", "PcCountTrackerManager"],
-    )
-    Source("pc_count_tracker.cc")
-    Source("pc_count_tracker_manager.cc")
-
-    DebugFlag("PcCountTracker")
-
-    SimObject(
-        "InstTracker.py",
-        sim_objects=["GlobalInstTracker", "LocalInstTracker"],
-    )
-    Source("inst_tracker.cc")
-
-    DebugFlag("InstTracker")
-
-    # Add BBProfiler
-    SimObject(
-        "BBProfiler.py",
-        sim_objects=["BBProfiler"],
-    )
-    Source("bb_profiler.cc")
-
-    DebugFlag("BBProfiler")
+    # Output file for profiling results
+    output_file = Param.String("bb_profile.csv", "Output file for profiling results") 

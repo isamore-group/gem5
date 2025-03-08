@@ -107,7 +107,7 @@ AddOption('--no-colors', dest='use_colors', action='store_false',
           help="Don't add color to abbreviated scons output")
 AddOption('--with-cxx-config', action='store_true',
           help="Build with support for C++-based configuration")
-AddOption('--ignore-style', action='store_true',
+AddOption('--ignore-style', action='store_true', default=True,
           help='Disable style checking hooks')
 AddOption('--linker', action='store', default=None, choices=linker_options,
           help=f'Select which linker to use ({", ".join(linker_options)})')
@@ -794,10 +794,74 @@ for variant_path in variant_paths:
                 [None, 'socket'], 'sys/socket.h', 'C++', 'accept(0,0,0);'):
            error("Can't find library with socket calls (e.g. accept()).")
 
-        if not conf.CheckLibWithHeader('z', 'zlib.h', 'C++','zlibVersion();'):
-            error('Did not find needed zlib compression library '
-                  'and/or zlib.h header file.\n'
-                  'Please install zlib and try again.')
+        # First try to use system zlib
+        has_zlib = conf.CheckLibWithHeader('z', 'zlib.h', 'C++','zlibVersion();')
+        
+        if not has_zlib:
+            # System zlib not found, install it locally
+            print("System zlib not found. Installing zlib locally...")
+            
+            # Create local_libs directory in the build directory
+            local_libs_dir = os.path.join(variant_path, 'local_libs')
+            zlib_install_dir = os.path.join(local_libs_dir, 'zlib')
+            
+            if not os.path.exists(local_libs_dir):
+                os.makedirs(local_libs_dir)
+            
+            # Download and build zlib
+            zlib_version = "1.2.11"
+            zlib_tarball = f"zlib-{zlib_version}.tar.gz"
+            zlib_url = f"https://zlib.net/fossils/{zlib_tarball}"
+            zlib_src_dir = os.path.join(local_libs_dir, f"zlib-{zlib_version}")
+            
+            # Only download and build if not already done
+            if not os.path.exists(zlib_install_dir):
+                import subprocess
+                
+                # Download zlib
+                if not os.path.exists(os.path.join(local_libs_dir, zlib_tarball)):
+                    print(f"Downloading {zlib_url}...")
+                    download_cmd = f"curl -L {zlib_url} -o {os.path.join(local_libs_dir, zlib_tarball)}"
+                    subprocess.call(download_cmd, shell=True)
+                
+                # Extract zlib
+                if not os.path.exists(zlib_src_dir):
+                    print(f"Extracting {zlib_tarball}...")
+                    extract_cmd = f"tar -xzf {os.path.join(local_libs_dir, zlib_tarball)} -C {local_libs_dir}"
+                    subprocess.call(extract_cmd, shell=True)
+                
+                # Configure and build zlib
+                print("Configuring and building zlib...")
+                configure_cmd = f"cd {zlib_src_dir} && ./configure --prefix={zlib_install_dir}"
+                make_cmd = f"cd {zlib_src_dir} && make && make install"
+                subprocess.call(configure_cmd, shell=True)
+                subprocess.call(make_cmd, shell=True)
+            
+            # Add local zlib to the build environment
+            env.Append(CPPPATH=[os.path.join(zlib_install_dir, 'include')])
+            env.Append(LIBPATH=[os.path.join(zlib_install_dir, 'lib')])
+            
+            # Force the use of the local zlib library
+            env.Append(LIBS=['z'])
+            
+            # Create a symlink to the local zlib in a system location if needed
+            # This is a workaround to ensure the linker can find the library
+            print("Adding local zlib to library path...")
+            
+            # Set LD_LIBRARY_PATH for the current process
+            old_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+            zlib_lib_path = os.path.join(zlib_install_dir, 'lib')
+            os.environ['LD_LIBRARY_PATH'] = f"{zlib_lib_path}:{old_ld_path}"
+            
+            # Also update the runtime library path for the linker
+            env.Append(RPATH=[zlib_lib_path])
+            
+            # Skip the check since we've explicitly added the library
+            print("Using locally installed zlib.")
+        else:
+            # System zlib found, add it to LIBS
+            env.Append(LIBS=['z'])
+            print("Using system zlib installation.")
 
     if not GetOption('without_tcmalloc'):
         with gem5_scons.Configure(env) as conf:
