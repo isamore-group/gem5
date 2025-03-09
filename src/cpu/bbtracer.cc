@@ -36,12 +36,14 @@
 #include <string>
 
 #include "arch/generic/mmu.hh"
+#include "arch/x86/regs/int.hh"
 #include "base/callback.hh"
 #include "base/debug.hh"
 #include "base/logging.hh"
 #include "base/statistics.hh"
 #include "base/trace.hh"
 #include "cpu/base.hh"
+#include "cpu/reg_class.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 #include "debug/BBTracer.hh"
@@ -63,25 +65,79 @@ namespace trace
 void
 BBTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
 {
-    // Check if this instruction is a basic block marker
-    std::string bbid;
-    if (tracer.isBBMarkerInst(inst, thread, pc->instAddr(), bbid)) {
-        if (debug::BBTracer) {
-            trace::getDebugLogger()->dprintf_flag(
-                curTick(), name(), "BBTracer",
-                "Found basic block marker: %s at PC %#x\n",
-                bbid, pc->instAddr());
-        }
-
-        // Record the basic block execution
-        tracer.recordBBExecution(bbid, when);
-    }
+    // The basic block detection is now done in setData methods
+    // This method is kept for compatibility but does minimal work
 }
 
 void
 BBTracerRecord::dump()
 {
     // We don't need to dump anything for the BB tracer
+}
+
+// Helper method to check for basic block markers
+void
+BBTracerRecord::checkForBBMarker()
+{
+    // Only check for lea instructions
+    std::string disasm = staticInst->disassemble(pc->instAddr());
+    // DPRINTF(BBTracer, "Disassembly: %s\n", disasm.c_str());
+
+    if (disasm.find("lea") == std::string::npos) {
+        return;
+    }
+    
+    
+    // We have a lea instruction and we're in setData, so we have the result
+    // The result is the effective address calculated by the lea instruction
+    // This address should point to our bbid string
+
+    // Get the data (address) from the instruction result
+    Addr targetAddr = data.asInt;  // For lea instructions, the result is stored as an integer
+
+    // Skip if the address is invalid or too small
+    if (targetAddr < 1000) {
+        return;
+    }
+    
+    // Try to read the memory at the target address
+    const int maxStringLength = 256;
+    uint8_t buffer[maxStringLength];
+    memset(buffer, 0, maxStringLength);
+    
+    TranslatingPortProxy proxy(thread);
+    if (proxy.tryReadBlob(targetAddr, buffer, maxStringLength)) {
+        // Check if the string starts with "bbid#"
+        std::string str(reinterpret_cast<char*>(buffer));
+
+        // the string should be like "____bbid#functionname#bbname"
+        if (str.find("____bbid#") == 0) {
+            // Extract the bbid (remove the "____bbid#" prefix)
+            std::string bbid = str.substr(9);
+            // Truncate at the first null character if present
+            size_t nullPos = bbid.find('\0');
+            if (nullPos != std::string::npos) {
+                bbid = bbid.substr(0, nullPos);
+            }
+            
+            DPRINTF(BBTracer, "Found bbid marker: %s at address %#x\n", 
+                    bbid.c_str(), targetAddr);
+                    
+            // Record the basic block execution
+            tracer.recordBBExecution(bbid, when);
+        }
+    }
+}
+
+// Override only the setData method used by lea instructions
+void
+BBTracerRecord::setData(const RegClass &reg_class, RegVal val)
+{
+    // Call the parent class method first
+    InstRecord::setData(reg_class, val);
+    
+    // Now check for basic block markers
+    checkForBBMarker();
 }
 
 BBTracer::BBTracer(const BBTracerParams &params)
@@ -114,91 +170,10 @@ BBTracer::getInstRecord(Tick when, ThreadContext *tc,
 {
     if (!debug::BBTracer)
         return nullptr;
+    
+    auto record = new BBTracerRecord(when, tc, staticInst, pc, *this, macroStaticInst);
 
-    return new BBTracerRecord(when, tc, staticInst, pc, *this, macroStaticInst);
-}
-
-bool
-BBTracer::isBBMarkerInst(const StaticInstPtr &inst, ThreadContext *tc, 
-                         Addr pc, std::string &bbid) const
-{
-    // Get the disassembly of the instruction
-    std::string disasm = inst->disassemble(pc);
-    
-    // Check if it's a lea instruction
-    if (disasm.find("lea") == std::string::npos) {
-        return false;
-    }
-    
-    // For x86 lea instructions, we need to extract the target address
-    // Example formats:
-    // "lea    0x123456(%rip), %rax"
-    // "leaq   symbol(%rip), %rax"
-    
-    // Extract the effective address from the lea instruction
-    // This is a simplified approach and may need to be adjusted based on
-    // the actual implementation of the CPU model
-    
-    // Try to extract the target address from the disassembly
-    std::regex targetPattern(R"(lea[q]?\s+([^,]+),%r[a-z0-9]+)");
-    std::smatch match;
-    
-    if (std::regex_search(disasm, match, targetPattern) && match.size() > 1) {
-        std::string targetExpr = match[1].str();
-        
-        // Now we need to evaluate the target expression to get the actual address
-        // This is architecture-specific and may require more complex parsing
-        
-        // For simplicity, let's assume the target is of the form "offset(%rip)"
-        std::regex offsetPattern(R"((-?0x[0-9a-f]+|\d+)\(%rip\))");
-        std::smatch offsetMatch;
-        
-        if (std::regex_search(targetExpr, offsetMatch, offsetPattern) && offsetMatch.size() > 1) {
-            std::string offsetStr = offsetMatch[1].str();
-            int64_t offset;
-            
-            // Convert the offset string to an integer
-            if (offsetStr.find("0x") == 0) {
-                // Hexadecimal offset
-                offset = std::stoll(offsetStr, nullptr, 16);
-            } else {
-                // Decimal offset
-                offset = std::stoll(offsetStr);
-            }
-            
-            // Calculate the target address
-            // The target address is PC + offset + size of the instruction
-            // For x86, we need to know the size of the instruction
-            // For simplicity, let's assume a fixed size of 7 bytes for lea instructions
-            const int leaInstructionSize = 7;
-            Addr targetAddr = pc + offset + leaInstructionSize;
-            
-            // Now read the memory at the target address to get the string
-            // We need to read the memory in chunks until we find a null terminator
-            const int maxStringLength = 256;
-            uint8_t buffer[maxStringLength];
-            memset(buffer, 0, maxStringLength);
-            
-            // Try to read the memory using the TranslatingPortProxy
-            TranslatingPortProxy proxy(tc);
-            if (proxy.tryReadBlob(targetAddr, buffer, maxStringLength)) {
-                // Check if the string starts with "bbid#"
-                std::string str(reinterpret_cast<char*>(buffer));
-                if (str.find("bbid#") == 0) {
-                    // Extract the bbid (remove the "bbid#" prefix)
-                    bbid = str.substr(5);
-                    // Truncate at the first null character if present
-                    size_t nullPos = bbid.find('\0');
-                    if (nullPos != std::string::npos) {
-                        bbid = bbid.substr(0, nullPos);
-                    }
-                    return true;
-                }
-            }
-        }
-    }
-    
-    return false;
+    return record;
 }
 
 void

@@ -71,9 +71,15 @@ class BBTracerRecord : public InstRecord
 
     void traceInst(const StaticInstPtr &inst, bool ran);
     void dump();
+    
+    // Override only the setData method used by lea instructions
+    void setData(const RegClass &reg_class, RegVal val);
 
   protected:
     const BBTracer &tracer;
+    
+    // Helper method to check for basic block markers
+    void checkForBBMarker();
 };
 
 /**
@@ -95,19 +101,6 @@ class BBTracer : public InstTracer
     InstRecord *getInstRecord(Tick when, ThreadContext *tc,
                              const StaticInstPtr staticInst, const PCStateBase &pc,
                              const StaticInstPtr macroStaticInst = nullptr) override;
-
-    /**
-     * Check if an instruction is a basic block marker
-     * Looks for lea instructions that reference a string with the format
-     * "bbid#functionname#bbname"
-     * @param inst The instruction to check
-     * @param tc The thread context
-     * @param pc The PC address of the instruction
-     * @param bbid Output parameter to store the extracted basic block ID
-     * @return True if the instruction is a basic block marker, false otherwise
-     */
-    bool isBBMarkerInst(const StaticInstPtr &inst, ThreadContext *tc, 
-                        Addr pc, std::string &bbid) const;
 
     /**
      * Record a basic block execution

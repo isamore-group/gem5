@@ -228,7 +228,7 @@ class InstRecord
         dataStatus = DataDouble;
     }
 
-    void
+    virtual void
     setData(const RegClass &reg_class, RegVal val)
     {
         new(&data.asReg) InstResult(reg_class, val);

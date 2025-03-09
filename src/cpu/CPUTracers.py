@@ -55,4 +55,4 @@ class BBTracer(InstTracer):
     cxx_header = "cpu/bbtracer.hh"
 
     # Output file for profiling results
-    output_file = Param.String("bb_profile.csv", "Output file for profiling results")
+    output_file = Param.String("__bb_tracer.csv", "Output file for profiling results")

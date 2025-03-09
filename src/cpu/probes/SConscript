@@ -44,12 +44,3 @@ if env['CONF']['BUILD_ISA']:
     Source("inst_tracker.cc")
 
     DebugFlag("InstTracker")
-
-    # Add BBProfiler
-    SimObject(
-        "BBProfiler.py",
-        sim_objects=["BBProfiler"],
-    )
-    Source("bb_profiler.cc")
-
-    DebugFlag("BBProfiler")
