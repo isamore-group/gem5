@@ -65,7 +65,7 @@ class BBProfiler : public ProbeListenerObject
      * Handler for the CommittedInst probe point
      * This is called for every committed instruction
      */
-    void committedInstHandler(const std::pair<const StaticInstPtr, const PCStateBase*> &inst_pc);
+    void committedInstHandler(const std::pair<const StaticInstPtr, Addr> &inst_pc);
 
     /**
      * Check if an instruction is a basic block marker
@@ -79,7 +79,7 @@ class BBProfiler : public ProbeListenerObject
     void writeResults();
 
   private:
-    typedef ProbeListenerArg<BBProfiler, std::pair<const StaticInstPtr, const PCStateBase*>> BBProfilerListener;
+    typedef ProbeListenerArg<BBProfiler, std::pair<const StaticInstPtr, Addr>> BBProfilerListener;
 
     /** Output file for profiling results */
     std::string outputFile;

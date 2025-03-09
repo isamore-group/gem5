@@ -79,28 +79,29 @@ BBProfiler::regProbeListeners()
 }
 
 void
-BBProfiler::committedInstHandler(const std::pair<const StaticInstPtr, const PCStateBase*> &inst_pc)
+BBProfiler::committedInstHandler(const std::pair<const StaticInstPtr, Addr> &inst_pc)
 {
-    if (!active)
+    if (!active) {
+        DPRINTF(BBProfiler, "BBProfiler is not active\n");
         return;
+    }
+    
 
     // Get the current time
     Tick currentTime = curTick();
 
     // Extract the instruction and PC from the pair
     const StaticInstPtr &inst = inst_pc.first;
-    const PCStateBase *pc = inst_pc.second;
+    Addr pc_addr = inst_pc.second;
 
-
+    // Get the PC address as a string
     std::stringstream ss;
-    pc->output(ss);
+    ss << "0x" << std::hex << pc_addr;
     std::string pc_str = ss.str();
 
     // Check if this instruction is a basic block marker
     std::string bbid;
     if (isBBMarkerInst(inst, bbid)) {
-        // Convert PC to string using a stringstream
-        
         DPRINTF(BBProfiler, "Found basic block marker: %s at PC %s\n",
                 bbid, pc_str);
 
@@ -117,7 +118,7 @@ BBProfiler::committedInstHandler(const std::pair<const StaticInstPtr, const PCSt
         lastBBTime = currentTime;
     } else {
       DPRINTF(BBProfiler, "Not a basic block marker: %s at PC %s\n",
-              inst->disassemble(pc->instAddr()), pc_str);
+              inst->disassemble(pc_addr), pc_str);
     }
 }
 

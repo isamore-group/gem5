@@ -69,6 +69,7 @@ DebugFlag('O3PipeView')
 DebugFlag('PCEvent')
 DebugFlag('Quiesce')
 DebugFlag('Mwait')
+DebugFlag('BBTracer', 'Basic Block Tracer')
 
 CompoundFlag('ExecAll', [ 'ExecEnable', 'ExecCPSeq', 'ExecEffAddr',
     'ExecFaulting', 'ExecFetchSeq', 'ExecOpClass', 'ExecRegDelta',
@@ -95,7 +96,7 @@ SimObject('CheckerCPU.py', sim_objects=['CheckerCPU'])
 SimObject('BaseCPU.py', sim_objects=['BaseCPU'])
 SimObject('CpuCluster.py', sim_objects=['CpuCluster'])
 SimObject('CPUTracers.py', sim_objects=[
-    'ExeTracer', 'IntelTrace', 'NativeTrace'])
+    'ExeTracer', 'IntelTrace', 'NativeTrace', 'BBTracer'])
 SimObject('TimingExpr.py', sim_objects=[
     'TimingExpr', 'TimingExprLiteral', 'TimingExprSrcReg', 'TimingExprLet',
     'TimingExprRef', 'TimingExprUn', 'TimingExprBin', 'TimingExprIf'],
@@ -115,6 +116,7 @@ Source('simple_thread.cc')
 Source('thread_context.cc')
 Source('thread_state.cc')
 Source('timing_expr.cc')
+Source('bbtracer.cc')
 
 if env['CONF']['USE_CAPSTONE']:
     SourceLib('capstone')

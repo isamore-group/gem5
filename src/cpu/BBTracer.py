@@ -1,4 +1,4 @@
-# Copyright (c) 2007 The Regents of The University of Michigan
+# Copyright (c) 2024 The Regents of The University of Michigan
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,35 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from m5.objects.InstTracer import InstTracer
 from m5.params import *
 from m5.proxy import *
-from m5.SimObject import SimObject
-
-
-class ExeTracer(InstTracer):
-    type = "ExeTracer"
-    cxx_class = "gem5::trace::ExeTracer"
-    cxx_header = "cpu/exetrace.hh"
-
-
-class IntelTrace(InstTracer):
-    type = "IntelTrace"
-    cxx_class = "gem5::trace::IntelTrace"
-    cxx_header = "cpu/inteltrace.hh"
-
-
-class NativeTrace(ExeTracer):
-    abstract = True
-    type = "NativeTrace"
-    cxx_class = "gem5::trace::NativeTrace"
-    cxx_header = "cpu/nativetrace.hh"
-
+from m5.objects.InstTracer import InstTracer
 
 class BBTracer(InstTracer):
-    type = "BBTracer"
-    cxx_class = "gem5::trace::BBTracer"
-    cxx_header = "cpu/bbtracer.hh"
+    type = 'BBTracer'
+    cxx_header = 'cpu/bbtracer.hh'
+    cxx_class = 'gem5::trace::BBTracer'
 
     # Output file for profiling results
-    output_file = Param.String("bb_profile.csv", "Output file for profiling results")
+    output_file = Param.String("bb_profile.csv", "Output file for profiling results") 

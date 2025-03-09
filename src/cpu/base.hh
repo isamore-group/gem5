@@ -562,6 +562,9 @@ class BaseCPU : public ClockedObject
     /** CPU cycle counter, only counts if any thread contexts is active **/
     probing::PMUUPtr ppActiveCycles;
 
+    /** Probe point for committed instructions with PC state */
+    ProbePointArg<std::pair<const StaticInstPtr, Addr>> *ppCommittedInst;
+
     /**
      * ProbePoint that signals transitions of threadContexts sets.
      * The ProbePoint reports information through it bool parameter.

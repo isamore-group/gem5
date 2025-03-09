@@ -49,6 +49,7 @@
 
 #include "arch/generic/decoder.hh"
 #include "arch/generic/isa.hh"
+#include "arch/generic/pcstate.hh"
 #include "arch/generic/tlb.hh"
 #include "base/cprintf.hh"
 #include "base/loader/symtab.hh"
@@ -392,6 +393,9 @@ BaseCPU::regProbePoints()
     ppRetiredStores = pmuProbePoint("RetiredStores");
     ppRetiredBranches = pmuProbePoint("RetiredBranches");
 
+    ppCommittedInst = new ProbePointArg<std::pair<const StaticInstPtr, Addr>>(
+        this->getProbeManager(), "CommittedInst");
+
     ppSleeping = new ProbePointArg<bool>(this->getProbeManager(),
                                          "Sleeping");
 }
@@ -412,6 +416,12 @@ BaseCPU::probeInstCommit(const StaticInstPtr &inst, Addr pc)
 
     if (inst->isControl())
         ppRetiredBranches->notify(1);
+        
+    // Notify the CommittedInst probe point with the instruction and PC address
+    // only cares about lea instructions
+    if (inst->disassemble(pc).find("lea") != std::string::npos) {
+        ppCommittedInst->notify(std::make_pair(inst, pc));
+    }
 }
 
 BaseCPU::
