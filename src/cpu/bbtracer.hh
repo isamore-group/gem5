@@ -114,6 +114,11 @@ class BBTracer : public InstTracer
      */
     void writeResults() const;
 
+    /**
+     * Increment the instruction count for the current basic block
+     */
+    void incrementInstCount() const;
+
   private:
     /** Output file for profiling results */
     std::string outputFile;
@@ -124,11 +129,17 @@ class BBTracer : public InstTracer
     /** Map of basic block IDs to total execution time (in ticks) */
     mutable std::unordered_map<std::string, Tick> bbTimes;
 
+    /** Map of basic block IDs to instruction counts */
+    mutable std::unordered_map<std::string, uint64_t> bbInstCounts;
+
     /** Last seen basic block ID */
     mutable std::string lastBBId;
 
     /** Timestamp of last basic block entry */
     mutable Tick lastBBTime;
+
+    /** Current instruction count since last basic block */
+    mutable uint64_t currentInstCount;
 };
 
 } // namespace trace

@@ -67,6 +67,11 @@ BBTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
 {
     // The basic block detection is now done in setData methods
     // This method is kept for compatibility but does minimal work
+    
+    // Increment the instruction count for the current basic block
+    if (ran) {
+        tracer.incrementInstCount();
+    }
 }
 
 void
@@ -81,7 +86,6 @@ BBTracerRecord::checkForBBMarker()
 {
     // Only check for lea instructions
     std::string disasm = staticInst->disassemble(pc->instAddr());
-    // DPRINTF(BBTracer, "Disassembly: %s\n", disasm.c_str());
 
     if (disasm.find("lea") == std::string::npos) {
         return;
@@ -120,8 +124,10 @@ BBTracerRecord::checkForBBMarker()
                 bbid = bbid.substr(0, nullPos);
             }
             
-            DPRINTF(BBTracer, "Found bbid marker: %s at address %#x\n", 
+            if (debug::BBTracer) {
+                DPRINTF(BBTracer, "Found bbid marker: %s at address %#x\n", 
                     bbid.c_str(), targetAddr);
+            }
                     
             // Record the basic block execution
             tracer.recordBBExecution(bbid, when);
@@ -144,7 +150,8 @@ BBTracer::BBTracer(const BBTracerParams &params)
     : InstTracer(static_cast<const InstTracerParams &>(params)),
       outputFile(params.output_file),
       lastBBId(""),
-      lastBBTime(0)
+      lastBBTime(0),
+      currentInstCount(0)
 {
     if (debug::BBTracer) {
         trace::getDebugLogger()->dprintf_flag(
@@ -179,17 +186,22 @@ BBTracer::getInstRecord(Tick when, ThreadContext *tc,
 void
 BBTracer::recordBBExecution(const std::string &bbid, Tick when) const
 {
+    DPRINTF(BBTracer, "Recording basic block execution: %s at time %d, inst count: %d\n", bbid.c_str(), when, currentInstCount);
     // Increment the count for this basic block
     bbCounts[bbid]++;
 
-    // If we've seen a previous basic block, update its time
+    // If we've seen a previous basic block, update its time and instruction count
     if (!lastBBId.empty()) {
         bbTimes[lastBBId] += (when - lastBBTime);
+        bbInstCounts[lastBBId] += currentInstCount;
     }
 
     // Update the last seen basic block
     lastBBId = bbid;
     lastBBTime = when;
+    
+    // Reset the instruction counter for the new basic block
+    currentInstCount = 0;
 }
 
 void
@@ -208,13 +220,14 @@ BBTracer::writeResults() const
     }
 
     // Write the header
-    outFile << "Basic Block ID,Execution Count,Total Time (ticks),Average Time (ticks)\n";
+    outFile << "Basic Block ID,Execution Count,Total Time (ticks),Average Time (ticks),Instruction Count,CPI\n";
 
     // Write the data for each basic block
     for (const auto &entry : bbCounts) {
         const std::string &bbid = entry.first;
         uint64_t count = entry.second;
         Tick totalTime = 0;
+        uint64_t instCount = 0;
         
         // Get the total time for this basic block
         auto timeIt = bbTimes.find(bbid);
@@ -222,14 +235,29 @@ BBTracer::writeResults() const
             totalTime = timeIt->second;
         }
         
+        // Get the instruction count for this basic block
+        auto instIt = bbInstCounts.find(bbid);
+        if (instIt != bbInstCounts.end()) {
+            instCount = instIt->second;
+        }
+        
         double avgTime = count > 0 ? static_cast<double>(totalTime) / count : 0.0;
+        double cpi = instCount > 0 ? static_cast<double>(totalTime) / instCount : 0.0;
 
         outFile << bbid << "," << count << "," << totalTime << "," << std::fixed
-                << std::setprecision(2) << avgTime << "\n";
+                << std::setprecision(2) << avgTime << "," << instCount << "," 
+                << std::setprecision(2) << cpi << "\n";
     }
 
     outFile.close();
     inform("BBTracer: Results written to %s\n", outputFile);
+}
+
+// Add a method to increment the instruction count
+void
+BBTracer::incrementInstCount() const
+{
+    currentInstCount++;
 }
 
 } // namespace trace
