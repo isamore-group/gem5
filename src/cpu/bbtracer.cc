@@ -61,19 +61,6 @@ namespace gem5
 
 namespace trace
 {
-
-void
-BBTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
-{
-    // The basic block detection is now done in setData methods
-    // This method is kept for compatibility but does minimal work
-    
-    // Increment the instruction count for the current basic block
-    if (ran) {
-        tracer.incrementInstCount();
-    }
-}
-
 void
 BBTracerRecord::dump()
 {
@@ -86,6 +73,8 @@ BBTracerRecord::checkForBBMarker()
 {
     // Only check for lea instructions
     std::string disasm = staticInst->disassemble(pc->instAddr());
+    tracer.incrementInstCount();
+    tracer.setCurrentTime(when);
 
     if (disasm.find("lea") == std::string::npos) {
         return;
@@ -130,7 +119,7 @@ BBTracerRecord::checkForBBMarker()
             }
                     
             // Record the basic block execution
-            tracer.recordBBExecution(bbid, when);
+            tracer.recordBBExecution(bbid);
         }
     }
 }
@@ -153,6 +142,7 @@ BBTracer::BBTracer(const BBTracerParams &params)
       lastBBTime(0),
       currentInstCount(0)
 {
+    currentTime = curTick();
     if (debug::BBTracer) {
         trace::getDebugLogger()->dprintf_flag(
             curTick(), name(), "BBTracer",
@@ -161,14 +151,14 @@ BBTracer::BBTracer(const BBTracerParams &params)
     }
 
     // Register a callback to write results when simulation ends
-    registerExitCallback([this]() { writeResults(); });
+    registerExitCallback([this]() { 
+        // // record the last basic block
+        // recordBBExecution(std::string("end"));
+        // write the results
+        writeResults(); 
+    });
 }
 
-BBTracer::~BBTracer()
-{
-    // Make sure results are written when the tracer is destroyed
-    writeResults();
-}
 
 InstRecord *
 BBTracer::getInstRecord(Tick when, ThreadContext *tc,
@@ -184,21 +174,21 @@ BBTracer::getInstRecord(Tick when, ThreadContext *tc,
 }
 
 void
-BBTracer::recordBBExecution(const std::string &bbid, Tick when) const
+BBTracer::recordBBExecution(const std::string &bbid) const
 {
-    DPRINTF(BBTracer, "Recording basic block execution: %s at time %d, inst count: %d\n", bbid.c_str(), when, currentInstCount);
+    DPRINTF(BBTracer, "Recording basic block execution: %s at time %d, inst count: %d\n", bbid.c_str(), currentTime, currentInstCount);
     // Increment the count for this basic block
     bbCounts[bbid]++;
 
     // If we've seen a previous basic block, update its time and instruction count
     if (!lastBBId.empty()) {
-        bbTimes[lastBBId] += (when - lastBBTime);
+        bbTimes[lastBBId] += (currentTime - lastBBTime);
         bbInstCounts[lastBBId] += currentInstCount;
     }
 
     // Update the last seen basic block
     lastBBId = bbid;
-    lastBBTime = when;
+    lastBBTime = currentTime;
     
     // Reset the instruction counter for the new basic block
     currentInstCount = 0;
@@ -258,6 +248,12 @@ void
 BBTracer::incrementInstCount() const
 {
     currentInstCount++;
+}
+
+void
+BBTracer::setCurrentTime(Tick when) const
+{
+    currentTime = when;
 }
 
 } // namespace trace

@@ -69,7 +69,6 @@ class BBTracerRecord : public InstRecord
           tracer(_tracer)
     {}
 
-    void traceInst(const StaticInstPtr &inst, bool ran);
     void dump();
     
     // Override only the setData method used by lea instructions
@@ -96,7 +95,6 @@ class BBTracer : public InstTracer
   public:
     typedef BBTracerParams Params;
     BBTracer(const BBTracerParams &params);
-    ~BBTracer();
 
     InstRecord *getInstRecord(Tick when, ThreadContext *tc,
                              const StaticInstPtr staticInst, const PCStateBase &pc,
@@ -105,9 +103,8 @@ class BBTracer : public InstTracer
     /**
      * Record a basic block execution
      * @param bbid The basic block ID
-     * @param when The current time
      */
-    void recordBBExecution(const std::string &bbid, Tick when) const;
+    void recordBBExecution(const std::string &bbid) const;
 
     /**
      * Write the profiling results to a file
@@ -118,6 +115,11 @@ class BBTracer : public InstTracer
      * Increment the instruction count for the current basic block
      */
     void incrementInstCount() const;
+
+    /**
+     * Set the current time
+     */
+    void setCurrentTime(Tick when) const;
 
   private:
     /** Output file for profiling results */
@@ -140,6 +142,9 @@ class BBTracer : public InstTracer
 
     /** Current instruction count since last basic block */
     mutable uint64_t currentInstCount;
+
+    /** Current time */
+    mutable Tick currentTime;
 };
 
 } // namespace trace
