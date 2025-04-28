@@ -152,8 +152,8 @@ BBTracer::BBTracer(const BBTracerParams &params)
 
     // Register a callback to write results when simulation ends
     registerExitCallback([this]() { 
-        // // record the last basic block
-        // recordBBExecution(std::string("end"));
+        // record the last basic block
+        recordBBExecution(std::string("end"));
         // write the results
         writeResults(); 
     });
