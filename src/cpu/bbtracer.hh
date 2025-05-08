@@ -63,7 +63,7 @@ class BBTracerRecord : public InstRecord
   public:
     BBTracerRecord(Tick _when, ThreadContext *_thread,
                   const StaticInstPtr _staticInst, const PCStateBase &_pc,
-                  const BBTracer &_tracer,
+                  BBTracer &_tracer,
                   const StaticInstPtr _macroStaticInst = nullptr)
         : InstRecord(_when, _thread, _staticInst, _pc, _macroStaticInst),
           tracer(_tracer)
@@ -74,11 +74,14 @@ class BBTracerRecord : public InstRecord
     // Override only the setData method used by lea instructions
     void setData(const RegClass &reg_class, RegVal val);
 
+    void setData(const RegClass &reg_class, const void *val);
+
+
   protected:
-    const BBTracer &tracer;
+    BBTracer &tracer;
     
     // Helper method to check for basic block markers
-    void checkForBBMarker();
+    void update();
 };
 
 /**
@@ -104,26 +107,32 @@ class BBTracer : public InstTracer
      * Record a basic block execution
      * @param bbid The basic block ID
      */
-    void recordBBExecution(const std::string &bbid) const;
+    void recordBBExecution(const std::string &bbid);
 
     /**
      * Write the profiling results to a file
      */
-    void writeResults() const;
+    void writeResults();
 
     /**
      * Increment the instruction count for the current basic block
      */
-    void incrementInstCount() const;
+    void incrementInstCount();
 
     /**
      * Set the current time
      */
-    void setCurrentTime(Tick when) const;
+    void setCurrentTime(Tick when);
 
   private:
+    /** Initialize the tracer */
+    void initialize();
+
     /** Output file for profiling results */
     std::string outputFile;
+
+    /** Input file for basic block operation counts */
+    std::string opCountFile;
 
     /** Map of basic block IDs to execution counts */
     mutable std::unordered_map<std::string, uint64_t> bbCounts;
@@ -133,6 +142,9 @@ class BBTracer : public InstTracer
 
     /** Map of basic block IDs to instruction counts */
     mutable std::unordered_map<std::string, uint64_t> bbInstCounts;
+
+    /** Map of basic block IDs to operation counts */
+    mutable std::unordered_map<std::string, uint64_t> bbOpCounts;
 
     /** Last seen basic block ID */
     mutable std::string lastBBId;

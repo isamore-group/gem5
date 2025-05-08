@@ -170,7 +170,7 @@ class InstRecord
             data.asReg.~InstResult();
     }
 
-    void setWhen(Tick new_when) { when = new_when; }
+    virtual void setWhen(Tick new_when) { when = new_when; }
     void
     setMem(Addr a, Addr s, unsigned f)
     {
@@ -247,7 +247,7 @@ class InstRecord
         }
     }
 
-    void
+    virtual void
     setData(const RegClass &reg_class, const void *val)
     {
         new(&data.asReg) InstResult(reg_class, val);

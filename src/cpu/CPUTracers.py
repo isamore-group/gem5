@@ -56,3 +56,5 @@ class BBTracer(InstTracer):
 
     # Output file for profiling results
     output_file = Param.String("__bb_tracer.csv", "Output file for profiling results")
+    # Input file for basic block operation counts
+    opcount_file = Param.String("__bb_opcounts.csv", "Input file for basic block operation counts")

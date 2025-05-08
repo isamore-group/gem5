@@ -69,17 +69,16 @@ BBTracerRecord::dump()
 
 // Helper method to check for basic block markers
 void
-BBTracerRecord::checkForBBMarker()
+BBTracerRecord::update()
 {
     // Only check for lea instructions
     std::string disasm = staticInst->disassemble(pc->instAddr());
-    tracer.incrementInstCount();
-    tracer.setCurrentTime(when);
 
+    tracer.setCurrentTime(when);
+    tracer.incrementInstCount();
     if (disasm.find("lea") == std::string::npos) {
         return;
     }
-    
     
     // We have a lea instruction and we're in setData, so we have the result
     // The result is the effective address calculated by the lea instruction
@@ -112,11 +111,6 @@ BBTracerRecord::checkForBBMarker()
             if (nullPos != std::string::npos) {
                 bbid = bbid.substr(0, nullPos);
             }
-            
-            if (debug::BBTracer) {
-                DPRINTF(BBTracer, "Found bbid marker: %s at address %#x\n", 
-                    bbid.c_str(), targetAddr);
-            }
                     
             // Record the basic block execution
             tracer.recordBBExecution(bbid);
@@ -130,18 +124,45 @@ BBTracerRecord::setData(const RegClass &reg_class, RegVal val)
 {
     // Call the parent class method first
     InstRecord::setData(reg_class, val);
-    
     // Now check for basic block markers
-    checkForBBMarker();
+    update();
+}
+
+void
+BBTracerRecord::setData(const RegClass &reg_class, const void *val)
+{
+    // Call the parent class method first
+    InstRecord::setData(reg_class, val);
+    // Now check for basic block markers
+    update();
 }
 
 BBTracer::BBTracer(const BBTracerParams &params)
     : InstTracer(static_cast<const InstTracerParams &>(params)),
       outputFile(params.output_file),
+      opCountFile(params.opcount_file),
       lastBBId(""),
       lastBBTime(0),
       currentInstCount(0)
 {
+    // Read the operation counts from the file
+    std::ifstream F(opCountFile.c_str());
+    if (!F.is_open()) {
+        warn("BBTracer: Could not open operation count file %s\n", opCountFile);
+        return;
+    }
+    std::string line;
+    // first line is the header
+    std::getline(F, line);
+    while (std::getline(F, line)) {
+        std::stringstream ss(line);
+        std::string bbid;
+        std::string opcount;
+        std::getline(ss, bbid, ',');
+        std::getline(ss, opcount);
+        bbOpCounts[bbid] = std::stoul(opcount);
+    }
+  
     currentTime = curTick();
     if (debug::BBTracer) {
         trace::getDebugLogger()->dprintf_flag(
@@ -165,8 +186,6 @@ BBTracer::getInstRecord(Tick when, ThreadContext *tc,
                        const StaticInstPtr staticInst, const PCStateBase &pc,
                        const StaticInstPtr macroStaticInst)
 {
-    if (!debug::BBTracer)
-        return nullptr;
     
     auto record = new BBTracerRecord(when, tc, staticInst, pc, *this, macroStaticInst);
 
@@ -174,9 +193,27 @@ BBTracer::getInstRecord(Tick when, ThreadContext *tc,
 }
 
 void
-BBTracer::recordBBExecution(const std::string &bbid) const
+BBTracer::initialize()
+{
+    DPRINTF(BBTracer, "Initializing BBTracer\n");
+    // Clear the maps
+    bbCounts.clear();
+    bbTimes.clear();
+    bbInstCounts.clear();
+    lastBBId = "";
+    lastBBTime = 0;
+    currentInstCount = 0;
+}
+
+void
+BBTracer::recordBBExecution(const std::string &bbid)
 {
     DPRINTF(BBTracer, "Recording basic block execution: %s at time %d, inst count: %d\n", bbid.c_str(), currentTime, currentInstCount);
+
+    if (bbid == "main#entry") {
+      initialize();
+    }
+
     // Increment the count for this basic block
     bbCounts[bbid]++;
 
@@ -195,7 +232,7 @@ BBTracer::recordBBExecution(const std::string &bbid) const
 }
 
 void
-BBTracer::writeResults() const
+BBTracer::writeResults()
 {
     // If we've seen a previous basic block, update its time
     if (!lastBBId.empty()) {
@@ -210,7 +247,7 @@ BBTracer::writeResults() const
     }
 
     // Write the header
-    outFile << "Basic Block ID,Execution Count,Total Time (ticks),Average Time (ticks),Instruction Count,CPI\n";
+    outFile << "Basic Block ID,Execution Count,Total Time (ticks),Average Time (ticks),Instruction Count,Operation Count,CPI\n";
 
     // Write the data for each basic block
     for (const auto &entry : bbCounts) {
@@ -218,6 +255,8 @@ BBTracer::writeResults() const
         uint64_t count = entry.second;
         Tick totalTime = 0;
         uint64_t instCount = 0;
+        uint64_t perBBInstCount = 0;
+        uint64_t opCount = 0;
         
         // Get the total time for this basic block
         auto timeIt = bbTimes.find(bbid);
@@ -231,12 +270,19 @@ BBTracer::writeResults() const
             instCount = instIt->second;
         }
         
+        // Get the operation count for this basic block
+        auto opIt = bbOpCounts.find(bbid);
+        if (opIt != bbOpCounts.end()) {
+            opCount = opIt->second;
+        }
+        perBBInstCount = instCount / count;
+        
         double avgTime = count > 0 ? static_cast<double>(totalTime) / count : 0.0;
         double cpi = instCount > 0 ? static_cast<double>(totalTime) / instCount : 0.0;
 
         outFile << bbid << "," << count << "," << totalTime << "," << std::fixed
-                << std::setprecision(2) << avgTime << "," << instCount << "," 
-                << std::setprecision(2) << cpi << "\n";
+                << std::setprecision(2) << avgTime << "," << perBBInstCount << "," 
+                << opCount << "," << std::setprecision(2) << cpi << "\n";
     }
 
     outFile.close();
@@ -245,13 +291,13 @@ BBTracer::writeResults() const
 
 // Add a method to increment the instruction count
 void
-BBTracer::incrementInstCount() const
+BBTracer::incrementInstCount()
 {
     currentInstCount++;
 }
 
 void
-BBTracer::setCurrentTime(Tick when) const
+BBTracer::setCurrentTime(Tick when)
 {
     currentTime = when;
 }
