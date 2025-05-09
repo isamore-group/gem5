@@ -169,6 +169,7 @@ class InstRecord
         if (dataStatus == DataReg)
             data.asReg.~InstResult();
     }
+    
 
     virtual void setWhen(Tick new_when) { when = new_when; }
     void
@@ -273,7 +274,7 @@ class InstRecord
         fetch_seq_valid = true;
     }
 
-    void
+    virtual void
     setCPSeq(InstSeqNum seq)
     {
         cp_seq = seq;

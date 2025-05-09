@@ -71,10 +71,12 @@ class BBTracerRecord : public InstRecord
 
     void dump();
     
-    // Override only the setData method used by lea instructions
-    void setData(const RegClass &reg_class, RegVal val);
+    void setCPSeq(InstSeqNum seq);
 
-    void setData(const RegClass &reg_class, const void *val);
+    // // Override only the setData method used by lea instructions
+    // void setData(const RegClass &reg_class, RegVal val);
+
+    // void setData(const RegClass &reg_class, const void *val);
 
 
   protected:
@@ -102,6 +104,26 @@ class BBTracer : public InstTracer
     InstRecord *getInstRecord(Tick when, ThreadContext *tc,
                              const StaticInstPtr staticInst, const PCStateBase &pc,
                              const StaticInstPtr macroStaticInst = nullptr) override;
+
+    /**
+     * Disable the map between register id and basic block id
+     * @param instRecord The instruction record
+     */
+    void disableRegToBBId(InstRecord *instRecord);
+
+    /**
+     * Update the map between register id and basic block id
+     * @param instRecord The instruction record
+     * @param bbid The basic block id
+     */
+    void updateRegToBBId(InstRecord *instRecord, const std::string &bbid);
+
+    /**
+     * Check if the instruction uses a register that is mapped to a basic block
+     * @param instRecord The instruction record
+     * @return The basic block id if the instruction uses a register that is mapped to a basic block, std::nullopt otherwise
+     */
+    std::optional<std::string> usesBBMarker(InstRecord *instRecord);
 
     /**
      * Record a basic block execution
@@ -133,6 +155,9 @@ class BBTracer : public InstTracer
 
     /** Input file for basic block operation counts */
     std::string opCountFile;
+
+    /** Map between register id and basic block id */
+    mutable std::unordered_map<RegId, std::string> regToBBId;
 
     /** Map of basic block IDs to execution counts */
     mutable std::unordered_map<std::string, uint64_t> bbCounts;

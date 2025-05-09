@@ -481,6 +481,7 @@ BaseSimpleCPU::postExecute()
 
     if (traceData) {
         traceData->dump();
+        traceData->setCPSeq(0);
         delete traceData;
         traceData = NULL;
     }
