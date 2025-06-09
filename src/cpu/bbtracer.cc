@@ -146,18 +146,18 @@ BBTracer::BBTracer(const BBTracerParams &params)
   std::ifstream F(opCountFile.c_str());
   if (!F.is_open()) {
     warn("BBTracer: Could not open operation count file %s\n", opCountFile);
-    return;
-  }
-  std::string line;
-  // first line is the header
-  std::getline(F, line);
-  while (std::getline(F, line)) {
-    std::stringstream ss(line);
-    std::string bbid;
-    std::string opcount;
-    std::getline(ss, bbid, ',');
-    std::getline(ss, opcount);
-    bbOpCounts[bbid] = std::stoul(opcount);
+  } else {
+    std::string line;
+    // first line is the header
+    std::getline(F, line);
+    while (std::getline(F, line)) {
+      std::stringstream ss(line);
+      std::string bbid;
+      std::string opcount;
+      std::getline(ss, bbid, ',');
+      std::getline(ss, opcount);
+      bbOpCounts[bbid] = std::stoul(opcount);
+    }
   }
 
   currentTime = curTick();
@@ -311,6 +311,8 @@ void BBTracer::writeResults() {
     auto opIt = bbOpCounts.find(bbid);
     if (opIt != bbOpCounts.end()) {
       opCount = opIt->second;
+    } else {
+      opCount = 0;
     }
     perBBInstCount = instCount / count;
 
